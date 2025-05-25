@@ -1,0 +1,252 @@
+{% extends "layout.html" %}
+{% block content %}
+    <h2>商品一覧</h2>
+    <div class="row">
+        {% for product in products %}
+        <div class="col-md-3">
+            <div class="card mb-4 product-card" data-product-id="{{ product.id }}" style="cursor: pointer; position: relative;">
+
+                <img src="{{ url_for('static', filename='images/' + product.image) }}" class="card-img-top" alt="{{ product.name }}">
+                <div class="card-body">
+                    <h5 class="card-title">{{ product.name }}</h5>
+
+                    <!-- 表示モード -->
+                    <div class="display-mode">
+                        <!-- スパナアイコンを追加 -->
+                        <a href="#" class="edit-icon btn btn-primary btn-sm">
+                            <i class="fas fa-wrench text-white"></i>
+                        </a>
+                        <p class="card-text">在庫: <span id="stock-{{ product.id }}">{{ product.stock }}</span></p>
+                        <p class="card-text">￥<span id="price-{{ product.id }}">{{ product.price }}</span></p>
+                    </div>
+
+                    <!-- 編集モード（初期状態では非表示） -->
+                    <div class="edit-mode" style="display: none;">
+                        <p class="card-text">
+                            商品名: <input type="text" class="name-input form-control form-control-sm" value="{{ product.name }}">
+                        </p>
+                        <p class="card-text">
+                            在庫: <input type="number" class="stock-input form-control form-control-sm" value="{{ product.stock }}">
+                        </p>
+                        <p class="card-text">
+                            価格: ￥<input type="number" class="price-input form-control form-control-sm" value="{{ product.price }}">
+                        </p>
+                        <p class="card-text">
+                            商品画像: <input type="file" class="image-input form-control form-control-sm" accept="image/*">
+                        </p>
+                        <button class="save-button btn btn-primary btn-sm">保存</button>
+                        <button class="cancel-button btn btn-secondary btn-sm">キャンセル</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Toastコンテナを右上に配置 -->
+    <div aria-live="polite" aria-atomic="true" class="position-fixed top-0 end-0 p-3" style="z-index: 5;">
+        <div id="toast-container"></div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Font Awesome の読み込み（必要に応じて） -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 商品カードをクリック可能にする
+    var productCards = document.querySelectorAll('.product-card');
+    productCards.forEach(function(card) {
+        card.addEventListener('click', function(event) {
+            // 編集モードが表示されている場合は何もしない
+            var editMode = card.querySelector('.edit-mode');
+            if (editMode.style.display === 'block') {
+                return;
+            }
+            var productId = this.getAttribute('data-product-id');
+            sellProduct(productId);
+        });
+    });
+
+    // 商品を販売する関数
+    function sellProduct(productId) {
+        fetch('/sell_product', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({product_id: productId})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // 在庫数を更新
+                var stockElement = document.getElementById('stock-' + productId);
+                var currentStock = parseInt(stockElement.textContent);
+                stockElement.textContent = currentStock - 1;
+
+                // Toastを表示
+                showToast(data.product_name, data.sale_id, productId);
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('エラー:', error);
+        });
+    }
+
+    // スパナアイコンをクリックしたときの処理
+    var editIcons = document.querySelectorAll('.edit-icon');
+    editIcons.forEach(function(icon) {
+        icon.addEventListener('click', function(event) {
+            event.stopPropagation(); // クリックイベントの伝播を止める
+            event.preventDefault(); // デフォルトの動作を止める
+            var productCard = this.closest('.product-card');
+            var productId = productCard.getAttribute('data-product-id');
+            showEditForm(productId, productCard);
+        });
+    });
+
+    function showEditForm(productId, productCard) {
+        var displayMode = productCard.querySelector('.display-mode');
+        var editMode = productCard.querySelector('.edit-mode');
+
+        displayMode.style.display = 'none';
+        editMode.style.display = 'block';
+
+        // 保存とキャンセルボタンのイベントリスナー
+        var saveButton = editMode.querySelector('.save-button');
+        var cancelButton = editMode.querySelector('.cancel-button');
+
+        saveButton.addEventListener('click', function(event) {
+            event.stopPropagation();
+            event.preventDefault();
+            saveProductChanges(productId, productCard);
+        });
+
+        cancelButton.addEventListener('click', function(event) {
+            event.stopPropagation();
+            event.preventDefault();
+            hideEditForm(productCard);
+        });
+    }
+
+    function hideEditForm(productCard) {
+        var displayMode = productCard.querySelector('.display-mode');
+        var editMode = productCard.querySelector('.edit-mode');
+
+        displayMode.style.display = 'block';
+        editMode.style.display = 'none';
+    }
+
+    function saveProductChanges(productId, productCard) {
+        var nameInput = productCard.querySelector('.name-input').value;
+        var priceInput = productCard.querySelector('.price-input').value;
+        var stockInput = productCard.querySelector('.stock-input').value;
+        var imageInput = productCard.querySelector('.image-input').files[0]; // 画像ファイル
+    
+        var formData = new FormData();
+        formData.append('product_id', productId);
+        formData.append('name', nameInput);
+        formData.append('price', priceInput);
+        formData.append('stock', stockInput);
+        if (imageInput) {
+            formData.append('image', imageInput); // 画像ファイルを追加
+        }
+    
+        fetch('/edit_product', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                productCard.querySelector('#price-' + productId).textContent = priceInput;
+                productCard.querySelector('#stock-' + productId).textContent = stockInput;
+                productCard.querySelector('.card-title').textContent = nameInput;
+    
+                if (imageInput) {
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        productCard.querySelector('.card-img-top').src = e.target.result;
+                    };
+                    reader.readAsDataURL(imageInput);
+                }
+    
+                hideEditForm(productCard);
+            } else {
+                alert('更新に失敗しました: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('エラー:', error);
+            alert('エラーが発生しました。');
+        });
+    }
+
+    // 既存のToastを表示する関数と販売を取り消す関数はそのまま
+    // Toastを表示する関数
+    function showToast(productName, saleId, productId) {
+        var toastContainer = document.getElementById('toast-container');
+
+        var toastElement = document.createElement('div');
+        toastElement.className = 'toast align-items-center text-bg-primary border-0 mt-2';
+        toastElement.setAttribute('role', 'alert');
+        toastElement.setAttribute('aria-live', 'assertive');
+        toastElement.setAttribute('aria-atomic', 'true');
+
+        toastElement.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">
+                    「${productName}」を購入しました。
+                    <button type="button" class="btn btn-sm text-white" onclick="undoSale(${saleId}, ${productId}, this)" style="background: none; border: none;">Undo↩️</button>
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        `;
+
+        toastContainer.appendChild(toastElement);
+
+        var toast = new bootstrap.Toast(toastElement, {delay: 5000});
+        toast.show();
+
+        // Toastが閉じられたら要素を削除
+        toastElement.addEventListener('hidden.bs.toast', function() {
+            toastElement.remove();
+        });
+    }
+
+    // 販売を取り消す関数
+    window.undoSale = function(saleId, productId, undoButton) {
+        fetch('/undo_sale', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({sale_id: saleId})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Toastを閉じる
+                var toastElement = undoButton.closest('.toast');
+                var toast = bootstrap.Toast.getInstance(toastElement);
+                toast.hide();
+
+                // 在庫数を更新
+                var stockElement = document.getElementById('stock-' + productId);
+                var currentStock = parseInt(stockElement.textContent);
+                stockElement.textContent = currentStock + 1;
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('エラー:', error);
+        });
+    }
+});
+</script>
+{% endblock %}

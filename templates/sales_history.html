@@ -1,0 +1,37 @@
+{% extends "layout.html" %}
+{% block content %}
+    <h2>販売履歴</h2>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Sale ID</th>
+                <th>Product ID</th>
+                <th>商品名</th>
+                <th>価格</th>
+                <th>数量</th>
+                <th>残り在庫</th>
+                <th>日時</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sale in sales %}
+            <tr>
+                <td>{{ sale.sale_id }}</td>
+                <td>{{ sale.product_id }}</td>
+                <td>{{ sale.product_name }}</td>
+                <td>¥{{ sale.price }}</td>
+                <td>{{ sale.quantity }}</td>
+                <td>{{ sale.remaining_stock }}</td>
+                <td>{{ sale.timestamp }}</td>
+                <td>
+                    <form method="post" action="{{ url_for('delete_sale') }}" onsubmit="return confirm('この販売記録を削除してもよろしいですか？');">
+                        <input type="hidden" name="sale_id" value="{{ sale.sale_id }}">
+                        <button type="submit" class="btn btn-danger btn-sm">削除</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

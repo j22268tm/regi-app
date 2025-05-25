@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+{% block content %}
+    <h2>設定・管理</h2>
+
+    <!-- メッセージの表示 -->
+    {% if message %}
+    <div class="alert alert-info">{{ message }}</div>
+    {% endif %}
+
+    <!-- データエクスポートボタン -->
+    <a href="{{ url_for('export') }}" class="btn btn-primary">データエクスポート (.csv)</a>
+
+    <!-- データ全リセットフォーム -->
+    <form action="{{ url_for('purge') }}" method="post" style="display:inline;" onsubmit="return confirm('本当にデータを全てリセットしますか？この操作は取り消せません。');">
+        <button type="submit" class="btn btn-danger">データ全リセット (危険)</button>
+    </form>
+{% endblock %}
